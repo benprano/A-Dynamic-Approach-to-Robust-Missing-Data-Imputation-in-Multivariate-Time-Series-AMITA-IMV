@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import os
 import torch
 import torch.nn as nn
@@ -27,10 +21,6 @@ from tqdm import tqdm
 from sklearn.metrics import mean_squared_error,r2_score, mean_absolute_error
 from transformers import AdamW, get_cosine_schedule_with_warmup, get_cosine_with_hard_restarts_schedule_with_warmup
 
-
-# In[2]:
-
-
 def seed_all(seed: int = 1992):
     """Seed all random number generators."""
     print("Using Seed Number {}".format(seed))
@@ -48,10 +38,6 @@ def seed_all(seed: int = 1992):
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
 seed_all()
-
-
-# In[4]:
-
 
 class AMITA2i_LSTM(torch.jit.ScriptModule):
     def __init__(self, input_size, hidden_size,seq_len, output_dim, batch_first=True, bidirectional=True):
@@ -314,10 +300,6 @@ class AMITA2i_LSTM(torch.jit.ScriptModule):
         out=torch.max(mu, dim=1).values
         return out, weights_decay, weights_fgate, imputed_inputs
 
-
-# In[5]:
-
-
 class TimeLSTM(nn.Module):
     def __init__(self, input_dim, hidden_dim,seq_len, output_dim, dropout=0.2):
         super(TimeLSTM, self).__init__()
@@ -337,10 +319,6 @@ class TimeLSTM(nn.Module):
             return decay_weights, fgate, imputed_inputs.mean(axis=2), outputs
         else:
             return outputs
-
-
-# In[6]:
-
 
 class DataSampler:
     def __init__(self, percentage=0.2):
@@ -368,10 +346,6 @@ class DataSampler:
         # Return the modified data with additional missing values
         return selected_data, data_with_missing, sampled_3d_indices
 
-
-# In[7]:
-
-
 class EnhancedLossCalculator:
     def __init__(self):
         pass
@@ -396,10 +370,6 @@ class EnhancedLossCalculator:
         # Combine imputation loss and prediction loss
         total_loss = prediction_loss + weighted_loss_imp
         return weighted_loss_imp, total_loss
-
-
-# In[8]:
-
 
 class EarlyStopping:
     def __init__(self, mode, path, patience=3, delta=0):
@@ -718,188 +688,3 @@ class TrainerHelpers:
             adj_r2 = self.adjusted_r2(y_true, y_pred, n, self.input_dim)
             scores.append([rmse, mae, r2, adj_r2])
         return scores
-
-
-# dn="/media/sangaria/8TB-FOLDERS/PAPER_REVIEWS_DATASETS_TASKS/TIMESERIES/24_HRS_DATA/ItaLyAirQuality"
-# task_dataset ="ItaLyAirQuality_24_HRS_DATA"
-
-# In[12]:
-
-
-dn="/media/sangaria/8TB-FOLDERS/PAPER_REVIEWS_DATASETS_TASKS/TIMESERIES/AMITA2i/24_HRS_DATA/BEIJINGAIRQUALITY MULTISITE"
-task_dataset ="BEIJINGAIRQUALITY_24_HRS_DATA_128"
-
-dn="/media/sangaria/8TB-FOLDERS/PAPER_REVIEWS_DATASETS_TASKS/TIMESERIES/AMITA2i/48_HRS_DATA/ETT_H1"
-task_dataset ="ETT_H1_48_BATCH_SIZE_128"
-# In[ ]:
-
-
-dn="/media/sangaria/8TB-FOLDERS/PAPER_REVIEWS_DATASETS_TASKS/TIMESERIES/AMITA2i/24_HRS_DATA/ITALYAIRQUALITY_POWERTRANSFORMER_24_HRS_DATA"
-task_dataset ="ITALYAIRQUALITY_24_POWERTRANSFORMER"
-
-
-# dn="/media/sangaria/8TB-FOLDERS/PAPER_REVIEWS_DATASETS_TASKS/TIMESERIES/AMITA2i/24_HRS_DATA/IHEPC_FORCASTING_24"
-# task_dataset ="IHEPC_FORCASTING_24_BATCH_SIZE_128"
-
-# In[13]:
-
-
-all_dataset_loader = np.load(os.path.join(os.path.join(dn,task_dataset),
-                                          "train_test_data.npz"), 
-                                          allow_pickle=True)
-
-
-# In[14]:
-
-
-train_val_loader = all_dataset_loader['folds_data_train_valid']
-
-
-# In[15]:
-
-
-test_loader = all_dataset_loader['folds_data_test']
-
-
-# In[16]:
-
-
-all_dataset_loader.files
-
-
-# In[17]:
-
-
-dataset_settings = np.load(os.path.join(os.path.join(dn,task_dataset),
-                                        "data_max_min.npz"), 
-                                         allow_pickle=True)
-
-
-# In[18]:
-
-
-dataset_settings.files
-
-
-# In[19]:
-
-
-dataset_settings['data_targets_max'], dataset_settings['data_targets_min']
-
-
-# In[20]:
-
-
-data_max, data_min= dataset_settings['data_max'], dataset_settings['data_min']
-
-
-# In[21]:
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-## device= 'cuda:1' 
-seq_length = dataset_settings['seq_length'].item()
-input_dim = dataset_settings['input_dim'].item()
-hidden_dim, output_dim  = 128, 1#dataset_settings['output_size'].item()
-seq_length, input_dim, hidden_dim, output_dim
-
-
-# In[22]:
-
-
-LEARNING_RATE = 1e-3
-optimizer_config={"lr": 1e-3, "betas": (0.9, 0.98), "eps": 4e-09, "weight_decay": 5e-4}
-NUM_EPOCHS =500
-NUM_FOLDS = 10
-model_name="AMITA2i".lower()
-n_patience = 100
-batch_size=64
-steps_per_epoch = int(dataset_settings['shape_data'][0] / batch_size / NUM_FOLDS)
-total_steps_per_fold = int(steps_per_epoch * NUM_EPOCHS)
-num_warmup_steps = int(0.1 * total_steps_per_fold)
-num_warmup_steps,total_steps_per_fold
-
-
-# In[23]:
-
-
-amita2i = TimeLSTM(input_dim, hidden_dim, seq_length, output_dim).to(device)
-# Create an instance of the class
-data_sampler = DataSampler(percentage=0.3)
-loss_calculator = EnhancedLossCalculator()
-optimizer = torch.optim.Adam(amita2i.parameters(), **optimizer_config)
-scheduler = get_cosine_with_hard_restarts_schedule_with_warmup(optimizer, 
-                                                               num_warmup_steps=num_warmup_steps, 
-                                                               num_training_steps=total_steps_per_fold, 
-                                                               num_cycles=2)
-criterion = nn.MSELoss().to(device)
-best_model_wts = deepcopy(amita2i.state_dict())
-amita2i
-
-
-# In[24]:
-
-
-train_valid_inference = TrainerHelpers(input_dim, hidden_dim, seq_length, output_dim,
-                                       device, optimizer, criterion, scheduler, NUM_EPOCHS, 
-                                       patience_n=n_patience, task=False)
-train_valid_inference
-
-
-# In[25]:
-
-
-task_dataset.split("_")[0], task_dataset
-
-
-# In[26]:
-
-
-main_path = f"/home/sangaria/Videos/Second journal paper/REVIEWS/AMITA2i-LSTM/LOSS FUNCTION/IMPUTATION/NEW_FUNCS/{task_dataset.split('_')[0]}_BENCHMARKS_RESULTS/30_M_RATE"
-task_path=f"{os.path.join(main_path, f'{task_dataset}')}"
-if not os.path.exists(task_path):
-    os.makedirs(task_path)
-task_path
-
-
-# In[27]:
-
-
-scores_folds= []
-for idx, (train_loader, test_data) in enumerate(zip(train_val_loader ,test_loader)):
-    print(f'[INFO]: Training on fold : {idx+1}')
-    # Reset the model weights
-    amita2i.load_state_dict(best_model_wts)
-    train_data, valid_data= train_loader
-    scores= train_valid_inference.train_validate_evaluate(TimeLSTM, amita2i, idx+1,train_data,valid_data,
-                                                          test_data, dataset_settings, task_path)
-    scores_folds.append(scores)
-
-
-# In[ ]:
-
-
-mse_mae_r2_task =np.mean([fold[0][0] for fold in scores_folds], axis=0)
-mse_mae_r2_task_imp = np.mean([fold[0][1] for fold in scores_folds], axis=0)
-
-
-# In[ ]:
-
-
-mse_mae_r2_task, mse_mae_r2_task_imp
-
-
-# In[ ]:
-
-
-np.savez(os.path.join(task_path, f"test_data_fold_{task_dataset.split('_')[0]}_results.npz".lower()), 
-                      reg_scores=scores_folds ,
-                      task_results=mse_mae_r2_task,
-                      imputation_results= mse_mae_r2_task_imp)
-
-
-# In[ ]:
-
-
-
-
