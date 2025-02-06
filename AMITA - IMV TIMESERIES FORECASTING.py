@@ -39,9 +39,9 @@ def seed_all(seed: int = 1992):
     torch.backends.cudnn.enabled = True
 seed_all()
 
-class AMITA2i_LSTM(torch.jit.ScriptModule):
+class AMITA_IMV(torch.jit.ScriptModule):
     def __init__(self, input_size, hidden_size,seq_len, output_dim, batch_first=True, bidirectional=True):
-        super(AMITA2i_LSTM, self).__init__()
+        super(AMITA_IMV, self).__init__()
         self.input_size = input_size
         self.output_dim = output_dim
         self.initializer_range=0.02
@@ -309,11 +309,11 @@ class TimeLSTM(nn.Module):
         self.seq_len = seq_len
         self.output_dim= output_dim
         # Temporal embedding MWTA_LSTM
-        self.amita_2i_lstm = AMITA2i_LSTM(self.input_size, self.hidden_size,
+        self.amita_imv_lstm = AMITA_IMV(self.input_size, self.hidden_size,
                                           self.seq_len, self.output_dim) 
     def forward(self,historic_features,timestamp, last_features, features_freqs , is_test=False):
         # Temporal features embedding
-        outputs, decay_weights, fgate, imputed_inputs = self.amita_2i_lstm(historic_features,timestamp, 
+        outputs, decay_weights, fgate, imputed_inputs = self.amita_imv_lstm(historic_features,timestamp, 
                                                                            last_features, features_freqs)
         if is_test:
             return decay_weights, fgate, imputed_inputs.mean(axis=2), outputs
@@ -346,7 +346,7 @@ class DataSampler:
         # Return the modified data with additional missing values
         return selected_data, data_with_missing, sampled_3d_indices
 
-class EnhancedLossCalculator:
+class AFAIL_LOSS:
     def __init__(self):
         pass
     
